@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 
 <html>
 
@@ -76,9 +76,8 @@
             label: "Cell shader",
             code: ` 
 
-        fn permute4(x: vec4f) -> vec4f { return ((x * 34. + 1.) * x) % vec4f(289.); }
+fn permute4(x: vec4f) -> vec4f { return ((x * 34. + 1.) * x) % vec4f(289.); }
 fn fade2(t: vec2f) -> vec2f { return t * t * t * (t * (t * 6. - 15.) + 10.); }
-
 fn perlinNoise2(P: vec2f) -> f32 {
     var Pi: vec4f = floor(P.xyxy) + vec4f(0., 0., 1., 1.);
     let Pf = fract(P.xyxy) - vec4f(0., 0., 1., 1.);
@@ -112,6 +111,29 @@ fn perlinNoise2(P: vec2f) -> f32 {
     return 2.3 * n_xy;
 }
 
+          // These are the gradient colors of the terrain levels
+          const deepSeaColor = vec3f(0.306, 0.604, 0.949);
+          const seaColor = vec3f(0.302, 0.784, 0.945);
+          const beachColor = vec3f(0.992, 0.953, 0.741);
+          const grassColor = vec3f(0.631, 0.839, 0.478);
+          const forestColor = vec3f(0.353, 0.522, 0.322);
+          const snowColor = vec3f(0.941, 0.918, 0.989);
+
+          // Function to interpolate between two colors based on a t value
+          fn mixColors(color1: vec3f, color2: vec3f, color3: vec3f, color4: vec3f, color5: vec3f, color6: vec3f, t: f32) -> vec3f {
+            if (t < 0.10) {
+                return mix(color1, color2, t / 0.10);
+            } else if (t < 0.20) {
+                return mix(color2, color3, (t - 0.10) / 0.10);
+            } else if (t < 0.35) {
+                return mix(color3, color4, (t - 0.20) / 0.15);
+            } else if (t < 0.80) {
+                return mix(color4, color5, (t - 0.35) / 0.45);
+            } else {
+                return mix(color5, color6, (t - 0.80) / 0.10);
+            }
+          }
+
           struct VertexOutput {
             @builtin(position) position: vec4f,
             @location(0) cell: vec2f,
@@ -130,11 +152,11 @@ fn perlinNoise2(P: vec2f) -> f32 {
             let gridPos = (position+1) / grid - 1 + cellOffset;
 
             let c = cell / grid;
-            let scale = f32(10);
+            let scale = f32(15);
             let zAxis = perlinNoise2((c + seed) * scale);
 
             var output: VertexOutput;
-            output.position = vec4f(gridPos, zAxis, 1);
+            output.position = vec4f(gridPos, zAxis / 2 + 0.5, 1);
             output.cell = cell;
             return output;
           }
@@ -142,8 +164,13 @@ fn perlinNoise2(P: vec2f) -> f32 {
           @fragment
           fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
             let c = input.cell / grid;
-            let scale = f32(10);
-            return vec4f(0, perlinNoise2((c + seed) * scale), 0, 0);
+            let scale = f32(15);
+            let z = perlinNoise2((c + seed) * scale);
+
+            // Interpolate between green and white based on z-value
+            let t = saturate(z);
+            let color = mixColors(deepSeaColor, seaColor, beachColor, grassColor, forestColor, snowColor, t);
+            return vec4f(color, 0.0);
           }
         `
         });
