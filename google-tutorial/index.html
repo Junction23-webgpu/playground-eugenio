@@ -5,12 +5,22 @@
 <head>
     <meta charset="utf-8">
     <title>03: Grid of Squares - WebGPU Life</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
 </head>
 
 <body>
-    <canvas width="1024" height="1024"></canvas>
+    <canvas></canvas>
     <script type="module">
-        const GRID_SIZE = 1024;
+        document.querySelector("canvas").width = window.outerWidth;
+        document.querySelector("canvas").height = window.outerHeight;
+        const GRID_SIZE = window.outerWidth;
 
         const canvas = document.querySelector("canvas");
 
@@ -64,7 +74,7 @@
         // Create the shader that will render the cells.
         const cellShaderModule = device.createShaderModule({
             label: "Cell shader",
-            code: `
+            code: ` 
 
         fn permute4(x: vec4f) -> vec4f { return ((x * 34. + 1.) * x) % vec4f(289.); }
 fn fade2(t: vec2f) -> vec2f { return t * t * t * (t * (t * 6. - 15.) + 10.); }
@@ -120,7 +130,7 @@ fn perlinNoise2(P: vec2f) -> f32 {
             let gridPos = (position+1) / grid - 1 + cellOffset;
 
             let c = cell / grid;
-            let scale = f32(20);
+            let scale = f32(10);
             let zAxis = perlinNoise2((c + seed) * scale);
 
             var output: VertexOutput;
@@ -132,7 +142,7 @@ fn perlinNoise2(P: vec2f) -> f32 {
           @fragment
           fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
             let c = input.cell / grid;
-            let scale = f32(20);
+            let scale = f32(10);
             return vec4f(0, perlinNoise2((c + seed) * scale), 0, 0);
           }
         `
