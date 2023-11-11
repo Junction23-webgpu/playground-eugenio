@@ -34,15 +34,16 @@
             format: canvasFormat,
         });
 
+
         // Create a buffer with the vertices for a single cell.
         const vertices = new Float32Array([
-            -0.8, -0.8,
-            0.8, -0.8,
-            0.8, 0.8,
+            -1, -1,
+            1, -1,
+            1, 1,
 
-            -0.8, -0.8,
-            0.8, 0.8,
-            -0.8, 0.8,
+            -1, -1,
+            1, 1,
+            -1, 1,
         ]);
         const vertexBuffer = device.createBuffer({
             label: "Cell vertices",
@@ -119,7 +120,7 @@ fn perlinNoise2(P: vec2f) -> f32 {
             let gridPos = (position+1) / grid - 1 + cellOffset;
 
             let c = cell / grid;
-            let scale = f32(10);
+            let scale = f32(20);
             let zAxis = perlinNoise2((c + seed) * scale);
 
             var output: VertexOutput;
@@ -131,7 +132,7 @@ fn perlinNoise2(P: vec2f) -> f32 {
           @fragment
           fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
             let c = input.cell / grid;
-            let scale = f32(10);
+            let scale = f32(20);
             return vec4f(0, perlinNoise2((c + seed) * scale), 0, 0);
           }
         `
