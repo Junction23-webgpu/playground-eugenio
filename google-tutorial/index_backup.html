@@ -1,0 +1,184 @@
+<!doctype html>
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>WebGPU Life</title>
+</head>
+
+<body>
+    <canvas width="512" height="512"></canvas>
+    <script type="module">
+        const canvas = document.querySelector("canvas");
+
+
+
+        if (!navigator.gpu) {
+            alert('WebGPU not supported');
+            throw new Error("WebGPU not supported on this browser.");
+        }
+
+        const adapter = await navigator.gpu.requestAdapter();
+        const device = await adapter.requestDevice();
+
+        const context = canvas.getContext("webgpu");
+        const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+        context.configure({
+            device: device,
+            format: canvasFormat,
+        });
+
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                view: context.getCurrentTexture().createView(),
+                loadOp: "clear",
+                clearValue: { r: 0, g: 0, b: 0.4, a: 1 },
+                storeOp: "store",
+            }]
+        });
+
+        const vertices = new Float32Array([
+            //   X,    Y,
+            -0.8, -0.8, // Triangle 1 (Blue)
+            0.8, -0.8,
+            0.8, 0.8,
+
+            -0.8, -0.8, // Triangle 2 (Red)
+            0.8, 0.8,
+            -0.8, 0.8,
+        ]);
+        const vertexBuffer = device.createBuffer({
+            label: "Cell vertices",
+            size: vertices.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(vertexBuffer, /*bufferOffset=*/0, vertices);
+        const vertexBufferLayout = {
+            arrayStride: 8,
+            attributes: [{
+                format: "float32x2",
+                offset: 0,
+                shaderLocation: 0, // Position, see vertex shader
+            }],
+        };
+
+
+        const GRID_SIZE = 4;
+        const uniformArray = new Float32Array([GRID_SIZE, GRID_SIZE]);
+        const uniformBuffer = device.createBuffer({
+            label: "Grid Uniforms",
+            size: uniformArray.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(uniformBuffer, 0, uniformArray);
+
+
+
+        const cellShaderModule = device.createShaderModule({
+            label: 'Cell shader',
+            code: `
+
+            fn permute4(x: vec4f) -> vec4f { return ((x * 34. + 1.) * x) % vec4f(289.); }
+fn fade2(t: vec2f) -> vec2f { return t * t * t * (t * (t * 6. - 15.) + 10.); }
+
+fn perlinNoise2(P: vec2f) -> f32 {
+    var Pi: vec4f = floor(P.xyxy) + vec4f(0., 0., 1., 1.);
+    let Pf = fract(P.xyxy) - vec4f(0., 0., 1., 1.);
+    Pi = Pi % vec4f(289.); // To avoid truncation effects in permutation
+    let ix = Pi.xzxz;
+    let iy = Pi.yyww;
+    let fx = Pf.xzxz;
+    let fy = Pf.yyww;
+    let i = permute4(permute4(ix) + iy);
+    var gx: vec4f = 2. * fract(i * 0.0243902439) - 1.; // 1/41 = 0.024...
+    let gy = abs(gx) - 0.5;
+    let tx = floor(gx + 0.5);
+    gx = gx - tx;
+    var g00: vec2f = vec2f(gx.x, gy.x);
+    var g10: vec2f = vec2f(gx.y, gy.y);
+    var g01: vec2f = vec2f(gx.z, gy.z);
+    var g11: vec2f = vec2f(gx.w, gy.w);
+    let norm = 1.79284291400159 - 0.85373472095314 *
+        vec4f(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11));
+    g00 = g00 * norm.x;
+    g01 = g01 * norm.y;
+    g10 = g10 * norm.z;
+    g11 = g11 * norm.w;
+    let n00 = dot(g00, vec2f(fx.x, fy.x));
+    let n10 = dot(g10, vec2f(fx.y, fy.y));
+    let n01 = dot(g01, vec2f(fx.z, fy.z));
+    let n11 = dot(g11, vec2f(fx.w, fy.w));
+    let fade_xy = fade2(Pf.xy);
+    let n_x = mix(vec2f(n00, n01), vec2f(n10, n11), vec2f(fade_xy.x));
+    let n_xy = mix(n_x.x, n_x.y, fade_xy.y);
+    return 2.3 * n_xy;
+}
+
+    @group(0) @binding(0) var<uniform> grid: vec2f;
+
+
+        @vertex
+fn vertexMain(@location(0) pos: vec2f,
+              @builtin(instance_index) instance: u32) ->
+  @builtin(position) vec4f {
+
+  let i = f32(instance);
+  // Compute the cell coordinate from the instance_index
+  let cell = vec2f(i % grid.x, floor(i / grid.x));
+
+  let cellOffset = cell / grid * 2;
+  let gridPos = (pos + 1) / grid - 1 + cellOffset;
+
+  return vec4f(gridPos, 0, 1);
+}
+
+    @fragment
+    fn fragmentMain() -> @location(0) vec4f {
+      return vec4f(1, 0, 0, 1);
+    }
+  `
+        });
+
+        const cellPipeline = device.createRenderPipeline({
+            label: "Cell pipeline",
+            layout: "auto",
+            vertex: {
+                module: cellShaderModule,
+                entryPoint: "vertexMain",
+                buffers: [vertexBufferLayout]
+            },
+            fragment: {
+                module: cellShaderModule,
+                entryPoint: "fragmentMain",
+                targets: [{
+                    format: canvasFormat
+                }]
+            }
+        });
+
+        const bindGroup = device.createBindGroup({
+            label: "Cell renderer bind group",
+            layout: cellPipeline.getBindGroupLayout(0),
+            entries: [{
+                binding: 0,
+                resource: { buffer: uniformBuffer }
+            }],
+        });
+
+        pass.setPipeline(cellPipeline);
+        pass.setVertexBuffer(0, vertexBuffer);
+        pass.setBindGroup(0, bindGroup);
+        pass.draw(vertices.length / 2, GRID_SIZE * GRID_SIZE);
+
+        pass.end();
+
+        // longer version
+        // const commandBuffer = encoder.finish();
+        // device.queue.submit([commandBuffer]);
+        device.queue.submit([encoder.finish()]);
+    </script>
+</body>
+
+</html>
