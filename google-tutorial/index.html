@@ -118,8 +118,12 @@ fn perlinNoise2(P: vec2f) -> f32 {
             let cellOffset = cell / grid * 2;
             let gridPos = (position+1) / grid - 1 + cellOffset;
 
+            let c = cell / grid;
+            let scale = f32(10);
+            let zAxis = perlinNoise2((c + seed) * scale);
+
             var output: VertexOutput;
-            output.position = vec4f(gridPos, 0, 1);
+            output.position = vec4f(gridPos, zAxis, 1);
             output.cell = cell;
             return output;
           }
