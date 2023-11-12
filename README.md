@@ -1,2 +1,3 @@
-# playground-eugenio
-The playground of Eugenio
+# fantasy-world-generator
+
+Visit our **[demo](https://fantasy-world-generator.euber.dev/)**
