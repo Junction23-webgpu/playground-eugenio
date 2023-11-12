@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 
 <html>
-
 <head>
     <meta charset="utf-8">
     <title>03: Grid of Squares - WebGPU Life</title>
@@ -14,13 +13,12 @@
         }
     </style>
 </head>
-
 <body>
     <canvas></canvas>
     <script type="module">
         document.querySelector("canvas").width = window.outerWidth;
         document.querySelector("canvas").height = window.outerHeight;
-        const GRID_SIZE = window.outerWidth;
+        const GRID_SIZE = window.outerWidth * 2;
 
         const canvas = document.querySelector("canvas");
 
@@ -110,6 +108,16 @@ fn perlinNoise2(P: vec2f) -> f32 {
     let n_xy = mix(n_x.x, n_x.y, fade_xy.y);
     return 2.3 * n_xy;
 }
+fn perlinNoise2Layered(P: vec2f, layerParams: vec3f) -> f32 {
+    // First Layer
+    let layer1 = perlinNoise2(P);
+    // Second Layer
+    let layer2 = perlinNoise2(P * layerParams.xy + layerParams.z);
+    // Third Layer
+    let layer3 = perlinNoise2(P * layerParams.xy * layerParams.xy + layerParams.z);
+
+    return 0.6 * layer1 + 0.2 * layer2 + 0.2* layer3;
+}
 
           // These are the gradient colors of the terrain levels
           const deepSeaColor = vec3f(0.306, 0.604, 0.949);
@@ -152,8 +160,8 @@ fn perlinNoise2(P: vec2f) -> f32 {
             let gridPos = (position+1) / grid - 1 + cellOffset;
 
             let c = cell / grid;
-            let scale = f32(15);
-            let zAxis = perlinNoise2((c + seed) * scale);
+            let scale = f32(30);
+            let zAxis = perlinNoise2Layered((c + seed) * scale, vec3f(2, 2, 2));
 
             var output: VertexOutput;
             output.position = vec4f(gridPos, zAxis / 2 + 0.5, 1);
@@ -164,8 +172,8 @@ fn perlinNoise2(P: vec2f) -> f32 {
           @fragment
           fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
             let c = input.cell / grid;
-            let scale = f32(15);
-            let z = perlinNoise2((c + seed) * scale);
+            let scale = f32(30);
+            let z = perlinNoise2Layered((c + seed) * scale, vec3f(2, 2, 2));
 
             // Interpolate between green and white based on z-value
             let t = saturate(z);
@@ -252,5 +260,4 @@ fn perlinNoise2(P: vec2f) -> f32 {
         device.queue.submit([encoder.finish()]);
     </script>
 </body>
-
 </html>
