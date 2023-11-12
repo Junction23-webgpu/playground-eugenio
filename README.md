@@ -19,3 +19,4 @@ Our proof of concept generates random worlds, composed of islands and the sea. I
 ## The demo
 
 Our demo is available at [https://fantasy-world-generator.euber.dev](https://fantasy-world-generator.euber.dev)
+A video presentation is available at [https://youtu.be/g6MUypJ0fCc](https://youtu.be/g6MUypJ0fCc)
